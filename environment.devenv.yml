@@ -1,0 +1,16 @@
+name: cg_playground-py36
+
+dependencies:
+  - python>=3.6
+  - numpy>=1.11.0
+  # pyopengl > 3.1.0 can't find the freeglut libs (??)
+  - pyopengl=3.1.0
+  - pyglfw
+  - pytest
+  - pytest-mock>=1.10
+  - conda-wrappers
+  #- esss_fix_format
+
+environment:
+  PYTHONPATH:
+    - {{ root }}/src
