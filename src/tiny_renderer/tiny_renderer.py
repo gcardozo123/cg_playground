@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 from scene import Scene
 import cv2
+from tiny_renderer.model import Model
 
 Color = namedtuple("Color", "r g b a")
 
@@ -12,35 +13,50 @@ class TinyRenderer(Scene):
     My own version of the original Tiny Renderer:
     https://github.com/ssloy/tinyrenderer/wiki
     """
-    def __init__(self, imgui_ctx):
-        self._imgui = imgui_ctx
-
+    def __init__(self):
         self._image_directory = Path('../resources/images/')
         assert self._image_directory.is_dir()
 
-        self._height = 300
-        self._width = 200
+        self._height = 800
+        self._width = 800
         self._image = np.zeros((self._height, self._width, 3), np.uint8)
 
-        #self._image[:, 0:self._width // 2] = (255, 0, 0)  # (B, G, R)
-        #self._image[:, self._width // 2:self._width] = (0, 255, 0)
+        self.white = Color(255, 255, 255, 2555)
+        self.red = Color(255, 0, 0, 2555)
 
-        white = Color(255, 255, 255, 2555)
-        red = Color(255, 0, 0, 2555)
-        self.line(13, 20, 80, 40, white)
-        self.line(80, 40, 13, 20, red)
-        self.line(20, 13, 40, 80, white)
-
-        #res = self.image_to_1_bit_array()
+        self._load_model()
         self.display_image()
+
+    def _load_model(self):
+        model = Model()
+        model.load_from_obj("../resources/african_head.obj")
+        for i in range(model.num_faces()):
+            face = model.get_face_at(i)
+            for j in range(3):
+                v0 = model.get_vertex_at(face[j])
+                v1 = model.get_vertex_at(face[(j + 1) % 3])
+                # scale down the model
+                x0 = (v0[0] + 1.0) * (self._width * 0.45)
+                y0 = (v0[1] + 1.0) * (self._height * 0.45)
+                x1 = (v1[0] + 1.0) * (self._width * 0.45)
+                y1 = (v1[1] + 1.0) * (self._height * 0.45)
+
+                x0, y0, x1, y1 = round(x0), round(y0), round(x1), round(y1)
+                if (x0, y0) == (x1, y1):
+                    continue
+                self.line(x0, y0, x1, y1, self.white)
 
     def update(self):
         pass
 
+    def get_image(self):
+        return np.flipud(self._image)
+
     def display_image(self):
+        cv2.namedWindow('Tiny Renderer', cv2.WINDOW_AUTOSIZE)
         # flip the image vertically so the origin is at the left bottom corner of the image
         # just because the original tiny renderer uses this origin ¯\_(ツ)_/¯
-        cv2.imshow('image', np.flipud(self._image))
+        cv2.imshow('Tiny Renderer', np.flipud(self._image))
 
     def save_image(self, filename):
         """
@@ -91,19 +107,6 @@ class TinyRenderer(Scene):
             if error > 0.5:
                 y += 1 if y1 > y0 else -1
                 error -= 1
-
-        # for each column between x0, x1 there's exactly one row, i.e., the x coordinate
-        # will never be repeated, it always increases one by one, so we need to calculate y:
-        # for x in range(x0, x1 + 1):
-        #     t = (x - x0) / (x1 - x0)
-        #     y = y0 * (1 - t) + y1 * t
-        #
-        #     y = round(y)
-        #     if steep:
-        #         # if transposed, de−transpose
-        #         self.set_pixel(y, x, color)
-        #     else:
-        #         self.set_pixel(x, y, color)
 
     def set_pixel(self, x, y, color):
         row = y
