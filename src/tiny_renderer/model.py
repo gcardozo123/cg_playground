@@ -5,6 +5,7 @@ class Model:
     """
     Represents a 3D model
     """
+
     VERTEX = "v"
     UV = "vt"
     NORMAL = "vn"
@@ -48,7 +49,7 @@ class Model:
         l 5 8 1 2 4 9
         """
         filename = Path(filename)
-        with open(filename, mode='r') as f:
+        with open(filename, mode="r") as f:
             lines = f.readlines()
 
         for line in lines:
@@ -66,5 +67,3 @@ class Model:
                 # for now let's just get the vertex index. I'm using -1 because they're 1-based T-T
                 vertex_indexes = tuple([int(v.split("/")[0]) - 1 for v in vertices])
                 self._faces.append(vertex_indexes)
-
-

@@ -1,12 +1,15 @@
-import numpy as np
-from OpenGL.GL import *
 from pathlib import Path
 
+import numpy as np
+from OpenGL.GL import *
+
 from scene import Scene
+
 
 def clear_gl_errors():
     while glGetError() != GL_NO_ERROR:
         continue
+
 
 def check_gl_errors():
     error = glGetError()
@@ -14,13 +17,15 @@ def check_gl_errors():
         print(error)
         error = glGetError()
 
+
 def gl_debug_callback(source, msg_type, msg_id, severity, length, raw, user):
     msg = raw[0:length]
-    print('debug', source, msg_type, msg_id, severity, msg)
+    print("debug", source, msg_type, msg_id, severity, msg)
+
 
 class GLBasics(Scene):
     def __init__(self):
-        print('OpenGL version: ', glGetString(GL_VERSION))
+        print("OpenGL version: ", glGetString(GL_VERSION))
 
         self._build_geometry()
         self._compile_shaders()
@@ -35,7 +40,7 @@ class GLBasics(Scene):
     def _build_geometry(self):
         vao = glGenVertexArrays(1)
         glBindVertexArray(vao)
-
+        # fmt: off
         verts = np.array([
             -1.0, -1.0, 0.0, # p0
             1.0, -1.0, 0.0,  # p1
@@ -44,19 +49,19 @@ class GLBasics(Scene):
             ],
             dtype=np.float32,
         )
-
+        # fmt: on
         vbo = glGenBuffers(1)
         glBindBuffer(GL_ARRAY_BUFFER, vbo)
         glBufferData(GL_ARRAY_BUFFER, verts, GL_STATIC_DRAW)
 
         glEnableVertexAttribArray(0)
         glVertexAttribPointer(
-            0, # index
-            3, # size (components)
-            GL_FLOAT, # type
-            GL_FALSE, # normalized
-            0, # stride
-            None # pointer
+            0,  # index
+            3,  # size (components)
+            GL_FLOAT,  # type
+            GL_FALSE,  # normalized
+            0,  # stride
+            None,  # pointer
         )
         elements = np.array([0, 1, 2, 0, 2, 3], dtype=np.int32)
 
@@ -80,8 +85,8 @@ class GLBasics(Scene):
             raise RuntimeError(glGetProgramInfoLog(program))
 
         glUseProgram(program)
-        #glDeleteShader(vertex_shader)
-        #glDeleteShader(fragment_shader)
+        # glDeleteShader(vertex_shader)
+        # glDeleteShader(fragment_shader)
 
     def _compile_shader_source(self, shader_id, shader_path):
         contents = Path(shader_path).read_text()

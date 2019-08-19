@@ -1,11 +1,12 @@
-import OpenGL.GL as gl
 import glfw
 import imgui
+import OpenGL.GL as gl
 from imgui.integrations.glfw import GlfwRenderer
+
 from tiny_renderer.tiny_renderer import TinyRenderer
 
 
-class  Application:
+class Application:
     def __init__(self, args):
         imgui.create_context()
         self._window = self._glfw_init()
@@ -32,7 +33,6 @@ class  Application:
         self._renderer.shutdown()
         glfw.terminate()
 
-
     def _glfw_init(self):
         """
         Initializes the glfw an OpenGL context and returns a window
@@ -52,9 +52,7 @@ class  Application:
         glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, gl.GL_TRUE)
 
         # Create a windowed mode window and its OpenGL context
-        window = glfw.create_window(
-            int(width), int(height), window_name, None, None
-        )
+        window = glfw.create_window(int(width), int(height), window_name, None, None)
         glfw.make_context_current(window)
 
         if not window:

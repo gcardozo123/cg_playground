@@ -6,7 +6,7 @@ dependencies:
   - pytest
   - pytest-mock>=1.10
   - conda-wrappers
-  #- esss_fix_format
+  - esss_fix_format
   # we also need pyimgui, but you'll need to install it with:
   # pip install imgui[full]
 
