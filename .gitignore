@@ -105,3 +105,5 @@ environment.yml
 
 # mypy
 .mypy_cache/
+
+src/imgui.ini
