@@ -37,7 +37,7 @@ class Application:
         """
         Initializes the glfw an OpenGL context and returns a window
         """
-        width, height = 1280, 720
+        width, height = 1600, 900
         window_name = "Computer Graphics Playground"
 
         if not glfw.init():

@@ -2,9 +2,11 @@ from collections import namedtuple
 from pathlib import Path
 
 import cv2
+import imgui
 import numpy as np
 
 from scene import Scene
+from tiny_renderer.imgui_image import Bitmap
 from tiny_renderer.model import Model
 
 Color = namedtuple("Color", "r g b a")
@@ -28,7 +30,7 @@ class TinyRenderer(Scene):
         self.red = Color(255, 0, 0, 2555)
 
         self._load_model()
-        self.display_image()
+        self._bitmap = Bitmap(self.get_image())
 
     def _load_model(self):
         model = Model()
@@ -50,12 +52,19 @@ class TinyRenderer(Scene):
                 self.line(x0, y0, x1, y1, self.white)
 
     def update(self):
-        pass
+        imgui.begin("Tiny Renderer")
+        imgui.image(
+            self._bitmap.get_texture_id(), self._bitmap.get_width(), self._bitmap.get_height()
+        )
+        imgui.end()
 
     def get_image(self):
         return np.flipud(self._image)
 
     def display_image(self):
+        """
+        Displays the image on a separate openCV window
+        """
         cv2.namedWindow("Tiny Renderer", cv2.WINDOW_AUTOSIZE)
         # flip the image vertically so the origin is at the left bottom corner of the image
         # just because the original tiny renderer uses this origin ¯\_(ツ)_/¯
