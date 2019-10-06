@@ -9,4 +9,4 @@ to implement a renderer step-by-step: implement line drawing, then .obj parsing,
 This is my progress so far:
 
 
-![Progress](resources/progress/progress3.png)
+![Progress](resources/progress/progress4.png)
