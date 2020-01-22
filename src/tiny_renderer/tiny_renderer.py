@@ -1,11 +1,10 @@
 from collections import namedtuple
-from math import sqrt
 from pathlib import Path
 
-import cv2
 import imgui
 import numpy as np
 
+import cv2
 from math_utils import Vec2, Vec3
 from scene import Scene
 from tiny_renderer.bitmap import Bitmap

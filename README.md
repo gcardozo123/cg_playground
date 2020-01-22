@@ -10,3 +10,18 @@ This is my progress so far:
 
 
 ![Progress](resources/progress/progress4.png)
+
+## Trying it out
+This project uses [Miniconda](https://docs.conda.io/en/latest/miniconda.html) as a package manager
+and [conda devenv](https://github.com/ESSS/conda-devenv). After installing `Miniconda` you need
+to install `conda-devenv` on your `base` (root environment) with:
+```bash
+conda activate base 
+conda install conda-devenv
+conda deactivate
+```
+Then in order to create the environment run
+```bash
+conda devenv
+```
+on the root of this project.

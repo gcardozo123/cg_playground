@@ -107,3 +107,5 @@ environment.yml
 .mypy_cache/
 
 src/imgui.ini
+
+.idea/
