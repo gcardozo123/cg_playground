@@ -11,6 +11,14 @@ class Vec2:
         self.x = x
         self.y = y
 
+    def __eq__(self, other):
+        if other is None:
+            return False
+        return self.x == other.x and self.y == other.y
+
+    def __ne__(self, other):
+        return not (self == other)
+
     def add(self, other):
         return Vec2(self.x + other.x, self.y + other.y)
 
@@ -36,12 +44,35 @@ class Vec2:
         other_mag = other.magnitude()
         return acos(dot_prod / (mag * other_mag))
 
+    @classmethod
+    def obtain_barycentric_weights(cls, p, v0, v1, v2):
+        """
+        Returns the barycentric weights (reference: https://codeplea.com/triangular-interpolation)
+        for a given point `p` inside a triangle (v0, v1, v2).
+        """
+        denominator = (v1.y - v2.y) * (v0.x - v2.x) + (v2.x - v1.x) * (v0.y - v2.y)
+        if denominator == 0:
+            return (-1, -1, -1)
+
+        w1 = ((v1.y - v2.y) * (p.x - v2.x) + (v2.x - v1.x) * (p.y - v2.y)) / denominator
+        w2 = ((v2.y - v0.y) * (p.x - v2.x) + (v0.x - v2.x) * (p.y - v2.y)) / denominator
+        w3 = 1 - w1 - w2
+        return (w1, w2, w3)
+
 
 class Vec3:
     def __init__(self, x=0.0, y=0.0, z=0.0):
         self.x = x
         self.y = y
         self.z = z
+
+    def __eq__(self, other):
+        if other is None:
+            return False
+        return self.x == other.x and self.y == other.y and self.z == other.z
+
+    def __ne__(self, other):
+        return not (self == other)
 
     def add(self, other):
         return Vec3(self.x + other.x, self.y + other.y, self.z + other.z)
@@ -127,9 +158,12 @@ class Vec3:
         Calculates Z value for a `p` point inside a triangle `v1`, `v2`, `v3`
         by calculating the weighted average Z.
         """
-        w0 = 1 / p.distance_2d(v0)
-        w1 = 1 / p.distance_2d(v1)
-        w2 = 1 / p.distance_2d(v2)
+        dist_p_v0 = p.distance_2d(v0)
+        dist_p_v1 = p.distance_2d(v1)
+        dist_p_v2 = p.distance_2d(v2)
+        w0 = (1 / dist_p_v0) if dist_p_v0 != 0 else 1
+        w1 = (1 / dist_p_v1) if dist_p_v1 != 0 else 1
+        w2 = (1 / dist_p_v2) if dist_p_v2 != 0 else 1
         # weighted average: z is more influenced by the closest vertex
         z = (w0 * v0.z + w1 * v1.z + w2 * v2.z) / (w0 + w1 + w2)
         return z

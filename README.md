@@ -9,7 +9,7 @@ to implement a renderer step-by-step: implement line drawing, then .obj parsing,
 This is my progress so far:
 
 
-![Progress](resources/progress/progress4.png)
+![Progress](resources/progress/progress7.png)
 
 ## Trying it out
 This project uses [Miniconda](https://docs.conda.io/en/latest/miniconda.html) as a package manager

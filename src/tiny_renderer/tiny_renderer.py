@@ -1,5 +1,5 @@
 from collections import namedtuple
-from pathlib import Path
+from typing import Tuple
 
 import imgui
 import numpy as np
@@ -27,9 +27,6 @@ class TinyRenderer(Scene):
     """
 
     def __init__(self):
-        self._image_directory = Path("../resources/images/")
-        assert self._image_directory.is_dir()
-
         self._height = 800
         self._width = 800
         self._depth = 800
@@ -45,6 +42,7 @@ class TinyRenderer(Scene):
 
         self.set_scale(0.45, 0.45, 0.45)
         self.load_model("../resources/african_head.obj")
+        self._texture_image = np.flipud(cv2.imread("../resources/african_head_diffuse.jpg"))
         self._rasterize_triangles()
         self._bitmap = Bitmap(self.get_image())
 
@@ -61,7 +59,7 @@ class TinyRenderer(Scene):
         self._model = Model()
         self._model.load_from_obj(filename)
 
-    def wireframe(self):
+    def draw_wireframe(self):
         for i in range(self._model.num_faces()):
             face = self._model.get_face_at(i)
             for j in range(3):
@@ -74,12 +72,13 @@ class TinyRenderer(Scene):
                 y1 = (v1[1] + 1.0) * (self._height * self._scale_y)
 
                 x0, y0, x1, y1 = round(x0), round(y0), round(x1), round(y1)
-                self.line(Vec3(x0, y0), Vec3(x1, y1), Colors.WHITE)
+                self.draw_line(Vec3(x0, y0), Vec3(x1, y1), Colors.WHITE, Colors.WHITE)
 
     def _rasterize_triangles(self):
         for i in range(self._model.num_faces()):
             face = self._model.get_face_at(i)
             verts = [self._model.get_vertex_at(face[x]) for x in range(3)]
+            uvs = self._model.get_uvs_from_face(i)
             # scale the model
             verts = [
                 Vec3(
@@ -95,15 +94,29 @@ class TinyRenderer(Scene):
 
             light_dir = Vec3(0, 0, -1)
             intensity = light_dir.dot(face_normal)
-
             if intensity > 0:
-                color = Color(255 * intensity, 255 * intensity, 255 * intensity, 255)
-                self.triangle(
-                    Vec3(round(verts[0].x), round(verts[0].y), round(verts[0].z)),
-                    Vec3(round(verts[1].x), round(verts[1].y), round(verts[1].z)),
-                    Vec3(round(verts[2].x), round(verts[2].y), round(verts[2].z)),
-                    color,
+                normals = self._model.get_normals_from_face(i)
+                self.draw_triangle(
+                    (
+                        Vec3(round(verts[0].x), round(verts[0].y), round(verts[0].z)),
+                        Vec3(round(verts[1].x), round(verts[1].y), round(verts[1].z)),
+                        Vec3(round(verts[2].x), round(verts[2].y), round(verts[2].z)),
+                    ),
+                    uvs,
+                    normals,
+                    light_dir,
                 )
+
+    def _get_rgb_from_uv(self, uv: tuple) -> tuple:
+        """
+        Returns the RGB color for an (u,v) normalized coordinate for `self._texture_image`
+        """
+        u, v = uv
+        height, width = self._texture_image.shape[0], self._texture_image.shape[1]
+        u_index = round(u * width)
+        v_index = round(v * height)
+        # reverse because values are stored as BGR:
+        return tuple(reversed(self._texture_image[v_index][u_index]))
 
     def update(self):
         if not self._bitmap:
@@ -135,9 +148,9 @@ class TinyRenderer(Scene):
         assert filename.parent.is_dir()
         cv2.imwrite(str(filename), self._image)
 
-    def line(self, v0: Vec3, v1: Vec3, color: Color = Colors.WHITE):
+    def draw_line(self, v0: Vec3, v1: Vec3, c0: Color, c1: Color):
         """
-        Draws a line from (x0, y0) to (x1, y1) using Bresenham's algorithm
+        Draws a line to `self._image`, from (x0, y0) to (x1, y1) using Bresenham's algorithm
         """
         v0, v1 = Vec3.clone(v0), Vec3.clone(v1)
         if (v0.x, v0.y) == (v1.x, v1.y):
@@ -155,8 +168,8 @@ class TinyRenderer(Scene):
         dy = v0.dy(v1)
         # make sure it goes from left to right:
         if v0.x > v1.x:
-            v0.x, v1.x = v1.x, v0.x
-            v0.y, v1.y = v1.y, v0.y
+            v0, v1 = v1, v0
+            c0, c1 = c1, c0
 
         if dx == 0:
             dx = 0.000001  # just to prevent zero division error
@@ -182,9 +195,17 @@ class TinyRenderer(Scene):
 
             # if transposed, de−transpose
             pixel_x, pixel_y = (p.y, p.x) if steep else (p.x, p.y)
+            c0, c1 = (c1, c0) if steep else (c0, c1)
 
             if distance_to_camera > self._z_buffer[pixel_y, pixel_x]:
                 self._z_buffer[pixel_y, pixel_x] = distance_to_camera
+
+                color = Color(
+                    c0.r * percentage + c1.r * (1 - percentage),
+                    c0.g * percentage + c1.g * (1 - percentage),
+                    c0.b * percentage + c1.b * (1 - percentage),
+                    255,
+                )
                 self.set_pixel(pixel_x, pixel_y, color)
 
             error += d_error
@@ -201,12 +222,22 @@ class TinyRenderer(Scene):
         # todo fix this: for now it only checks the blue coordinate (index 0)
         return self._image[:, :, 0] > 0
 
-    def triangle(self, p0: Vec3, p1: Vec3, p2: Vec3, color: Color):
+    def draw_triangle(self, vertices, uvs, normals, light_direction):
         """
         Draws a triangle into self._image
         """
+        p0, p1, p2 = vertices
+        if (p0 in (p1, p2)) or (p1 == p2):
+            # triangle is degenerated
+            return
+
+        uv0, uv1, uv2 = uvs
+        n0, n1, n2 = normals
         if not Vec3.is_counterclockwise(p0, p1, p2):
-            p0, p1, p2 = (p0, p2, p1) if Vec3.is_counterclockwise(p0, p2, p1) else (p1, p0, p2)
+            is_p0_p2_p1_counterclockwise = Vec3.is_counterclockwise(p0, p2, p1)
+            p0, p1, p2 = (p0, p2, p1) if is_p0_p2_p1_counterclockwise else (p1, p0, p2)
+            uv0, uv1, uv2 = (uv0, uv2, uv1) if is_p0_p2_p1_counterclockwise else (uv1, uv0, uv2)
+            n0, n1, n2 = (n0, n2, n1) if is_p0_p2_p1_counterclockwise else (n1, n0, n2)
 
         # create 4 points representing the bounding box of the triangle
         min_x = min(p0.x, min(p1.x, p2.x))
@@ -217,19 +248,49 @@ class TinyRenderer(Scene):
         for y in range(min_y, max_y + 1):
             for x in range(min_x, max_x + 1):
                 p = Vec2(x, y)
-                is_inside_triangle = True
-                for edge in [(p0, p1), (p1, p2), (p2, p0)]:
-                    if not Vec3.is_left(p, edge[0], edge[1]):
-                        is_inside_triangle = False
-                        break
-                if is_inside_triangle:
-                    p3d = Vec3(x, y, Vec3.interpolate_z(Vec3(x, y), p0, p1, p2))
-                    distance_to_camera = p3d.distance(self._camera_postion)
-                    if distance_to_camera > self._z_buffer[y, x]:
-                        self._z_buffer[y, x] = distance_to_camera
-                        self.set_pixel(x, y, color)
 
-        # draw the triangle border
-        self.line(p0, p2, color)
-        self.line(p0, p1, color)
-        self.line(p1, p2, color)
+                barycentric_weights = Vec2.obtain_barycentric_weights(p, p0, p1, p2)
+                is_inside_triangle = (
+                    barycentric_weights[0] >= 0
+                    and barycentric_weights[1] >= 0
+                    and barycentric_weights[2] >= 0
+                )
+                if not is_inside_triangle:
+                    continue
+
+                p3d = Vec3(p.x, p.y, Vec3.interpolate_z(Vec3(x, y), p0, p1, p2))
+                distance_to_camera = p3d.distance(self._camera_postion)
+                if distance_to_camera > self._z_buffer[y, x]:
+                    self._z_buffer[y, x] = distance_to_camera
+                    final_uv = (
+                        uv0[0] * barycentric_weights[0]
+                        + uv1[0] * barycentric_weights[1]
+                        + uv2[0] * barycentric_weights[2],
+                        uv0[1] * barycentric_weights[0]
+                        + uv1[1] * barycentric_weights[1]
+                        + uv2[1] * barycentric_weights[2],
+                    )
+                    rgb = self._get_rgb_from_uv(final_uv)
+
+                    final_normal = Vec3(
+                        n0.x * barycentric_weights[0]
+                        + n1.x * barycentric_weights[1]
+                        + n2.x * barycentric_weights[2],
+                        n0.y * barycentric_weights[0]
+                        + n1.y * barycentric_weights[1]
+                        + n2.y * barycentric_weights[2],
+                        n0.z * barycentric_weights[0]
+                        + n1.z * barycentric_weights[1]
+                        + n2.z * barycentric_weights[2],
+                    )
+                    light_intensity = abs(light_direction.dot(final_normal))
+                    self.set_pixel(
+                        x,
+                        y,
+                        Color(
+                            rgb[0] * light_intensity,
+                            rgb[1] * light_intensity,
+                            rgb[2] * light_intensity,
+                            255,
+                        ),
+                    )
