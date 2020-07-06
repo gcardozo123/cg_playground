@@ -1,4 +1,5 @@
 from math import acos, sqrt
+from typing import Sequence
 
 
 class Vec2:
@@ -142,28 +143,9 @@ class Vec3:
         """
         return Vec3.triangle_area(p0, p1, p2) > 0
 
-    @classmethod
-    def is_left(cls, p0, p1, p2):
-        """
-        Returns True if p0 is on the left of the line p2 - p1.
-        p ^ <- p is on the left side of the line
-         /
-        /
-        """
-        return Vec3.triangle_area(p0, p1, p2) > 0
 
-    @classmethod
-    def interpolate_z(cls, p, v0, v1, v2):
-        """
-        Calculates Z value for a `p` point inside a triangle `v1`, `v2`, `v3`
-        by calculating the weighted average Z.
-        """
-        dist_p_v0 = p.distance_2d(v0)
-        dist_p_v1 = p.distance_2d(v1)
-        dist_p_v2 = p.distance_2d(v2)
-        w0 = (1 / dist_p_v0) if dist_p_v0 != 0 else 1
-        w1 = (1 / dist_p_v1) if dist_p_v1 != 0 else 1
-        w2 = (1 / dist_p_v2) if dist_p_v2 != 0 else 1
-        # weighted average: z is more influenced by the closest vertex
-        z = (w0 * v0.z + w1 * v1.z + w2 * v2.z) / (w0 + w1 + w2)
-        return z
+def apply_weights(values: Sequence[float], weights: Sequence[float]):
+    """
+    Returns values[0] * weights[0] + values[1] * weights[1] + ... + values[n] * weights[n]
+    """
+    return sum([v[0] * v[1] for v in zip(values, weights)])

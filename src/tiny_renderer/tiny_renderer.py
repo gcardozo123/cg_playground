@@ -1,11 +1,11 @@
 from collections import namedtuple
-from typing import Tuple
+from typing import Sequence
 
 import imgui
 import numpy as np
 
 import cv2
-from math_utils import Vec2, Vec3
+from math_utils import Vec2, Vec3, apply_weights
 from scene import Scene
 from tiny_renderer.bitmap import Bitmap
 from tiny_renderer.model import Model
@@ -36,7 +36,7 @@ class TinyRenderer(Scene):
         self._scale_z = 1.0
 
         self._image = np.zeros((self._height, self._width, 3), np.uint8)
-        self._z_buffer = np.full((self._height, self._width, 1), np.NINF)
+        self._z_buffer = np.full((self._height, self._width, 1), np.inf)
         self._camera_postion = Vec3(0, 0, -1)
         self._model = None
 
@@ -92,19 +92,17 @@ class TinyRenderer(Scene):
             other_edge = verts[1].sub(verts[0])
             face_normal = edge.cross(other_edge).normalized()
 
-            light_dir = Vec3(0, 0, -1)
+            light_dir = self._camera_postion
             intensity = light_dir.dot(face_normal)
             if intensity > 0:
                 normals = self._model.get_normals_from_face(i)
+                vertices = (
+                    Vec3(round(verts[0].x), round(verts[0].y), verts[0].z),
+                    Vec3(round(verts[1].x), round(verts[1].y), verts[1].z),
+                    Vec3(round(verts[2].x), round(verts[2].y), verts[2].z),
+                )
                 self.draw_triangle(
-                    (
-                        Vec3(round(verts[0].x), round(verts[0].y), round(verts[0].z)),
-                        Vec3(round(verts[1].x), round(verts[1].y), round(verts[1].z)),
-                        Vec3(round(verts[2].x), round(verts[2].y), round(verts[2].z)),
-                    ),
-                    uvs,
-                    normals,
-                    light_dir,
+                    vertices, uvs, normals, light_dir,
                 )
 
     def _get_rgb_from_uv(self, uv: tuple) -> tuple:
@@ -130,15 +128,6 @@ class TinyRenderer(Scene):
 
     def get_image(self):
         return np.flipud(self._image)
-
-    def display_image(self):
-        """
-        Displays the image on a separate openCV window
-        """
-        cv2.namedWindow("Tiny Renderer", cv2.WINDOW_AUTOSIZE)
-        # flip the image vertically so the origin is at the left bottom corner of the image
-        # just because the original tiny renderer uses this origin ¯\_(ツ)_/¯
-        cv2.imshow("Tiny Renderer", np.flipud(self._image))
 
     def save_image(self, filename):
         """
@@ -218,11 +207,13 @@ class TinyRenderer(Scene):
         col = x
         self._image[row, col] = (color.r, color.g, color.b)
 
-    def image_to_1_bit_array(self):
-        # todo fix this: for now it only checks the blue coordinate (index 0)
-        return self._image[:, :, 0] > 0
-
-    def draw_triangle(self, vertices, uvs, normals, light_direction):
+    def draw_triangle(
+        self,
+        vertices: Sequence[Vec3],
+        uvs: Sequence[Vec2],
+        normals: Sequence[Vec2],
+        light_direction: Vec3,
+    ):
         """
         Draws a triangle into self._image
         """
@@ -250,47 +241,35 @@ class TinyRenderer(Scene):
                 p = Vec2(x, y)
 
                 barycentric_weights = Vec2.obtain_barycentric_weights(p, p0, p1, p2)
-                is_inside_triangle = (
-                    barycentric_weights[0] >= 0
-                    and barycentric_weights[1] >= 0
-                    and barycentric_weights[2] >= 0
-                )
-                if not is_inside_triangle:
+                is_part_of_triangle = all(w >= 0 for w in barycentric_weights)
+                if not is_part_of_triangle:
                     continue
 
-                p3d = Vec3(p.x, p.y, Vec3.interpolate_z(Vec3(x, y), p0, p1, p2))
+                p3d = Vec3(p.x, p.y, apply_weights([p0.z, p1.z, p2.z], barycentric_weights))
                 distance_to_camera = p3d.distance(self._camera_postion)
                 if distance_to_camera > self._z_buffer[y, x]:
-                    self._z_buffer[y, x] = distance_to_camera
-                    final_uv = (
-                        uv0[0] * barycentric_weights[0]
-                        + uv1[0] * barycentric_weights[1]
-                        + uv2[0] * barycentric_weights[2],
-                        uv0[1] * barycentric_weights[0]
-                        + uv1[1] * barycentric_weights[1]
-                        + uv2[1] * barycentric_weights[2],
-                    )
-                    rgb = self._get_rgb_from_uv(final_uv)
+                    # hidden face removal
+                    continue
 
-                    final_normal = Vec3(
-                        n0.x * barycentric_weights[0]
-                        + n1.x * barycentric_weights[1]
-                        + n2.x * barycentric_weights[2],
-                        n0.y * barycentric_weights[0]
-                        + n1.y * barycentric_weights[1]
-                        + n2.y * barycentric_weights[2],
-                        n0.z * barycentric_weights[0]
-                        + n1.z * barycentric_weights[1]
-                        + n2.z * barycentric_weights[2],
-                    )
-                    light_intensity = abs(light_direction.dot(final_normal))
-                    self.set_pixel(
-                        x,
-                        y,
-                        Color(
-                            rgb[0] * light_intensity,
-                            rgb[1] * light_intensity,
-                            rgb[2] * light_intensity,
-                            255,
-                        ),
-                    )
+                self._z_buffer[y, x] = p3d.z
+                final_uv = (
+                    apply_weights([uv0.x, uv1.x, uv2.x], barycentric_weights),
+                    apply_weights([uv0.y, uv1.y, uv2.y], barycentric_weights),
+                )
+                rgb = self._get_rgb_from_uv(final_uv)
+                final_normal = Vec3(
+                    apply_weights([n0.x, n1.x, n2.x], barycentric_weights),
+                    apply_weights([n0.y, n1.y, n2.y], barycentric_weights),
+                    apply_weights([n0.z, n1.z, n2.z], barycentric_weights),
+                )
+                light_intensity = abs(light_direction.dot(final_normal))
+                self.set_pixel(
+                    x,
+                    y,
+                    Color(
+                        rgb[0] * light_intensity,
+                        rgb[1] * light_intensity,
+                        rgb[2] * light_intensity,
+                        255,
+                    ),
+                )

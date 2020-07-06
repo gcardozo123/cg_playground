@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List
 
-from math_utils import Vec3
+from math_utils import Vec2, Vec3
 
 
 class Model:
@@ -125,7 +125,7 @@ class Model:
                 self._normal_indexes.append(normal_indexes)
             elif line_type == Model.UV:
                 u, v, _ = line_split[1:]
-                self._uvs.append((float(u), float(v)))
+                self._uvs.append(Vec2(float(u), float(v)))
             elif line_type == Model.NORMAL:
                 self._normals.append(
                     Vec3(

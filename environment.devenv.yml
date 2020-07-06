@@ -1,4 +1,4 @@
-name: cg_playground-py36
+name: cg_playground-py38
 
 dependencies:
   - python==3.8.1
