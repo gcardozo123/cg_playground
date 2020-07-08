@@ -88,22 +88,16 @@ class TinyRenderer(Scene):
                 )
                 for v in verts
             ]
-            edge = verts[2].sub(verts[0])
-            other_edge = verts[1].sub(verts[0])
-            face_normal = edge.cross(other_edge).normalized()
-
             light_dir = self._camera_postion
-            intensity = light_dir.dot(face_normal)
-            if intensity > 0:
-                normals = self._model.get_normals_from_face(i)
-                vertices = (
-                    Vec3(round(verts[0].x), round(verts[0].y), verts[0].z),
-                    Vec3(round(verts[1].x), round(verts[1].y), verts[1].z),
-                    Vec3(round(verts[2].x), round(verts[2].y), verts[2].z),
-                )
-                self.draw_triangle(
-                    vertices, uvs, normals, light_dir,
-                )
+            normals = self._model.get_normals_from_face(i)
+            vertices = (
+                Vec3(round(verts[0].x), round(verts[0].y), verts[0].z),
+                Vec3(round(verts[1].x), round(verts[1].y), verts[1].z),
+                Vec3(round(verts[2].x), round(verts[2].y), verts[2].z),
+            )
+            self.draw_triangle(
+                vertices, uvs, normals, light_dir,
+            )
 
     def _get_rgb_from_uv(self, uv: tuple) -> tuple:
         """
@@ -224,11 +218,6 @@ class TinyRenderer(Scene):
 
         uv0, uv1, uv2 = uvs
         n0, n1, n2 = normals
-        if not Vec3.is_counterclockwise(p0, p1, p2):
-            is_p0_p2_p1_counterclockwise = Vec3.is_counterclockwise(p0, p2, p1)
-            p0, p1, p2 = (p0, p2, p1) if is_p0_p2_p1_counterclockwise else (p1, p0, p2)
-            uv0, uv1, uv2 = (uv0, uv2, uv1) if is_p0_p2_p1_counterclockwise else (uv1, uv0, uv2)
-            n0, n1, n2 = (n0, n2, n1) if is_p0_p2_p1_counterclockwise else (n1, n0, n2)
 
         # create 4 points representing the bounding box of the triangle
         min_x = min(p0.x, min(p1.x, p2.x))
@@ -245,13 +234,14 @@ class TinyRenderer(Scene):
                 if not is_part_of_triangle:
                     continue
 
-                p3d = Vec3(p.x, p.y, apply_weights([p0.z, p1.z, p2.z], barycentric_weights))
+                p3d = Vec3(p.x, p.y, round(apply_weights([p0.z, p1.z, p2.z], barycentric_weights)))
+
                 distance_to_camera = p3d.distance(self._camera_postion)
                 if distance_to_camera > self._z_buffer[y, x]:
-                    # hidden face removal
+                    # ignore hidden pixel
                     continue
+                self._z_buffer[y, x] = distance_to_camera
 
-                self._z_buffer[y, x] = p3d.z
                 final_uv = (
                     apply_weights([uv0.x, uv1.x, uv2.x], barycentric_weights),
                     apply_weights([uv0.y, uv1.y, uv2.y], barycentric_weights),

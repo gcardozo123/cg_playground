@@ -67,6 +67,9 @@ class Vec3:
         self.y = y
         self.z = z
 
+    def __str__(self):
+        return f"({self.x}, {self.y}, {self.z})"
+
     def __eq__(self, other):
         if other is None:
             return False

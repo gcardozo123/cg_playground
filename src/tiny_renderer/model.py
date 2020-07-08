@@ -108,7 +108,7 @@ class Model:
 
             if line_type == Model.VERTEX:
                 self._verts.append(
-                    (float(line_split[1]), float(line_split[2]), float(line_split[3]))
+                    (float(line_split[1]), float(line_split[2]), float(line_split[3]) * -1)
                 )
             elif line_type == Model.FACE:
                 vert_tex_norm = line_split[1:]  # vertex/texture/normal
