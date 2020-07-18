@@ -6,10 +6,10 @@ progress through computer graphics topics.
 ## Tiny renderer
 I'm implementing my own version of [this](https://github.com/ssloy/tinyrenderer/wiki) great tutorial, the idea is
 to implement a renderer step-by-step: implement line drawing, then .obj parsing, then wireframe rendering and so on.
-This is my progress so far:
+Here's a video with my progress so far:
 
 
-![Progress](resources/progress/progress7.png)
+[![](http://img.youtube.com/vi/yxCV73AJJt8/0.jpg)](http://www.youtube.com/watch?v=yxCV73AJJt8 "Click to play on Youtube")
 
 ## Trying it out
 This project uses [Miniconda](https://docs.conda.io/en/latest/miniconda.html) as a package manager

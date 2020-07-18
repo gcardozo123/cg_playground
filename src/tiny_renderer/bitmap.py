@@ -17,6 +17,11 @@ class Bitmap:
         self._texture_id = glGenTextures(1)
         self._width = -1
         self._height = -1
+        self._pixels = pixels
+
+    def bind_texture(self, *, pixels: np.array = None):
+        if pixels is None:
+            pixels = self._pixels
 
         glBindTexture(GL_TEXTURE_2D, self._texture_id)
         backup = glGetIntegerv(GL_UNPACK_ALIGNMENT)
