@@ -1,12 +1,12 @@
+import random
 from collections import namedtuple
+from enum import IntEnum
 from typing import Sequence
 
-import imgui
 import numpy as np
 
 import cv2
 from math_utils import Vec2, Vec3, apply_weights
-from scene import Scene
 from tiny_renderer.bitmap import Bitmap
 from tiny_renderer.model import Model
 
@@ -14,13 +14,59 @@ Color = namedtuple("Color", "r g b a")
 
 
 class Colors:
-    WHITE = Color(255, 255, 255, 255)
-    RED = Color(255, 0, 0, 255)
-    GREEN = Color(0, 255, 0, 255)
-    BLUE = Color(0, 0, 255, 255)
+    White = Color(255, 255, 255, 255)
+    Red = Color(255, 0, 0, 255)
+    Green = Color(0, 255, 0, 255)
+    Blue = Color(0, 0, 255, 255)
 
 
-class TinyRenderer(Scene):
+class LightingMode(IntEnum):
+    """
+    Lighting mode for `TinyRenderer`
+    """
+
+    Smooth = 0
+    Flat = 1
+
+    @classmethod
+    def get_caption(cls, index):
+        captions = {
+            cls.Smooth: "Smooth",
+            cls.Flat: "Flat",
+        }
+        return captions[index]
+
+    @classmethod
+    def get_captions(cls):
+        return [LightingMode.get_caption(i) for i in LightingMode]
+
+
+class RenderingMode(IntEnum):
+    """
+    Possible rendering modes for `TinyRenderer`
+    """
+
+    Wireframe = 0
+    RandomColors = 1
+    Texturized = 2
+    LightOnly = 3
+
+    @classmethod
+    def get_caption(cls, index):
+        captions = {
+            cls.Wireframe: "Wireframe",
+            cls.RandomColors: "Random color",
+            cls.Texturized: "Texturized",
+            cls.LightOnly: "Light only",
+        }
+        return captions[index]
+
+    @classmethod
+    def get_captions(cls):
+        return [RenderingMode.get_caption(i) for i in RenderingMode]
+
+
+class TinyRenderer:
     """
     My own version of the original Tiny Renderer:
     https://github.com/ssloy/tinyrenderer/wiki
@@ -39,14 +85,29 @@ class TinyRenderer(Scene):
         self._z_buffer = np.full((self._height, self._width, 1), np.inf)
         self._camera_postion = Vec3(0, 0, -1)
         self._model = None
-
         self.set_scale(0.45, 0.45, 0.45)
+
+        self._render_mode = None
+        self._light_mode = None
+        self._bitmap = Bitmap(self.get_image())
+        self._texture_image = None
+
         self.load_model("../resources/african_head.obj")
         self._texture_image = np.flipud(cv2.imread("../resources/african_head_diffuse.jpg"))
-        self._rasterize_triangles()
-        self._bitmap = Bitmap(self.get_image())
 
-    def clear_image(self):
+    @property
+    def bitmap(self) -> Bitmap:
+        return self._bitmap
+
+    def render(self, render_mode: RenderingMode, light_mode: LightingMode):
+        self.clear()
+
+        self._render_mode = render_mode
+        self._light_mode = light_mode
+        self._rasterize()
+        self._bitmap.bind_texture(pixels=self.get_image())
+
+    def clear(self):
         self._image = np.zeros((self._height, self._width, 3), np.uint8)
         self._z_buffer = np.full((self._height, self._width, 1), np.inf)
 
@@ -59,7 +120,7 @@ class TinyRenderer(Scene):
         self._model = Model()
         self._model.load_from_obj(filename)
 
-    def draw_wireframe(self):
+    def _draw_wireframe(self):
         for i in range(self._model.num_faces()):
             face = self._model.get_face_at(i)
             for j in range(3):
@@ -72,9 +133,13 @@ class TinyRenderer(Scene):
                 y1 = (v1[1] + 1.0) * (self._height * self._scale_y)
 
                 x0, y0, x1, y1 = round(x0), round(y0), round(x1), round(y1)
-                self.draw_line(Vec3(x0, y0), Vec3(x1, y1), Colors.WHITE, Colors.WHITE)
+                self.draw_line(Vec3(x0, y0), Vec3(x1, y1), Colors.White, Colors.White)
 
-    def _rasterize_triangles(self):
+    def _rasterize(self):
+        if self._render_mode == RenderingMode.Wireframe:
+            self._draw_wireframe()
+            return
+
         for i in range(self._model.num_faces()):
             face = self._model.get_face_at(i)
             verts = [self._model.get_vertex_at(face[x]) for x in range(3)]
@@ -109,16 +174,6 @@ class TinyRenderer(Scene):
         v_index = round(v * height)
         # reverse because values are stored as BGR:
         return tuple(reversed(self._texture_image[v_index][u_index]))
-
-    def update(self):
-        if not self._bitmap:
-            return
-
-        imgui.begin("Tiny Renderer")
-        imgui.image(
-            self._bitmap.get_texture_id(), self._bitmap.get_width(), self._bitmap.get_height()
-        )
-        imgui.end()
 
     def get_image(self):
         return np.flipud(self._image)
@@ -180,7 +235,7 @@ class TinyRenderer(Scene):
             pixel_x, pixel_y = (p.y, p.x) if steep else (p.x, p.y)
             c0, c1 = (c1, c0) if steep else (c0, c1)
 
-            if distance_to_camera > self._z_buffer[pixel_y, pixel_x]:
+            if distance_to_camera < self._z_buffer[pixel_y, pixel_x]:
                 self._z_buffer[pixel_y, pixel_x] = distance_to_camera
 
                 color = Color(
@@ -219,6 +274,16 @@ class TinyRenderer(Scene):
         uv0, uv1, uv2 = uvs
         n0, n1, n2 = normals
 
+        if self._light_mode == LightingMode.Flat:
+            edge = p2.sub(p0)
+            other_edge = p1.sub(p0)
+            final_normal = edge.cross(other_edge).normalized()
+
+        if self._render_mode == RenderingMode.LightOnly:
+            final_color = Colors.White
+        elif self._render_mode == RenderingMode.RandomColors:
+            final_color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+
         # create 4 points representing the bounding box of the triangle
         min_x = min(p0.x, min(p1.x, p2.x))
         max_x = max(p0.x, max(p1.x, p2.x))
@@ -242,24 +307,28 @@ class TinyRenderer(Scene):
                     continue
                 self._z_buffer[y, x] = distance_to_camera
 
-                final_uv = (
-                    apply_weights([uv0.x, uv1.x, uv2.x], barycentric_weights),
-                    apply_weights([uv0.y, uv1.y, uv2.y], barycentric_weights),
-                )
-                rgb = self._get_rgb_from_uv(final_uv)
-                final_normal = Vec3(
-                    apply_weights([n0.x, n1.x, n2.x], barycentric_weights),
-                    apply_weights([n0.y, n1.y, n2.y], barycentric_weights),
-                    apply_weights([n0.z, n1.z, n2.z], barycentric_weights),
-                )
+                if self._render_mode == RenderingMode.Texturized:
+                    final_uv = (
+                        apply_weights([uv0.x, uv1.x, uv2.x], barycentric_weights),
+                        apply_weights([uv0.y, uv1.y, uv2.y], barycentric_weights),
+                    )
+                    final_color = self._get_rgb_from_uv(final_uv)
+
+                if self._light_mode == LightingMode.Smooth:
+                    final_normal = Vec3(
+                        apply_weights([n0.x, n1.x, n2.x], barycentric_weights),
+                        apply_weights([n0.y, n1.y, n2.y], barycentric_weights),
+                        apply_weights([n0.z, n1.z, n2.z], barycentric_weights),
+                    )
+
                 light_intensity = abs(light_direction.dot(final_normal))
                 self.set_pixel(
                     x,
                     y,
                     Color(
-                        rgb[0] * light_intensity,
-                        rgb[1] * light_intensity,
-                        rgb[2] * light_intensity,
+                        final_color[0] * light_intensity,
+                        final_color[1] * light_intensity,
+                        final_color[2] * light_intensity,
                         255,
                     ),
                 )

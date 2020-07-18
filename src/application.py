@@ -3,7 +3,7 @@ import imgui
 import OpenGL.GL as gl
 from imgui.integrations.glfw import GlfwRenderer
 
-from tiny_renderer.tiny_renderer import TinyRenderer
+from tiny_renderer.tiny_renderer_editor import TinyRendererEditor
 
 
 class Application:
@@ -11,7 +11,7 @@ class Application:
         imgui.create_context()
         self._window = self._glfw_init()
         self._renderer = GlfwRenderer(self._window)
-        self._scene = TinyRenderer()
+        self._scene = TinyRendererEditor()
         self.main_loop()
 
     def main_loop(self):
@@ -27,7 +27,9 @@ class Application:
             self._scene.update()
 
             imgui.render()
-            self._renderer.render(imgui.get_draw_data())
+            draw_data = imgui.get_draw_data()
+            if draw_data.valid:
+                self._renderer.render(draw_data)
             glfw.swap_buffers(self._window)
 
         self._renderer.shutdown()
