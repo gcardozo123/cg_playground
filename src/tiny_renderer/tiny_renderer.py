@@ -1,11 +1,12 @@
 import random
 from collections import namedtuple
 from enum import IntEnum
-from typing import Sequence
+from pathlib import Path
+from typing import Sequence, Union
 
 import numpy as np
+from PIL import Image
 
-import cv2
 from math_utils import Vec2, Vec3, apply_weights
 from tiny_renderer.bitmap import Bitmap
 from tiny_renderer.model import Model
@@ -72,7 +73,13 @@ class TinyRenderer:
     https://github.com/ssloy/tinyrenderer/wiki
     """
 
-    def __init__(self):
+    def __init__(self, *, bind_texture=True):
+        """
+        :param bind_texture:
+            If `True`, `TinyRenderer` will create a `tiny_renderer.bitmap.Bitmap` instance
+            binding any rendered image to an OpenGL texture. This can be disabled for tests
+            so they don't need to initialize an OpenGL context.
+        """
         self._height = 800
         self._width = 800
         self._depth = 800
@@ -89,11 +96,16 @@ class TinyRenderer:
 
         self._render_mode = None
         self._light_mode = None
-        self._bitmap = Bitmap(self.get_image())
+        self._bind_texture = bind_texture
+        self._bitmap = Bitmap(self.get_image()) if bind_texture else None
         self._texture_image = None
 
-        self.load_model("../resources/african_head.obj")
-        self._texture_image = np.flipud(cv2.imread("../resources/african_head_diffuse.jpg"))
+    def setup_model(self, model_filename: Union[str, Path], texture_filename: Union[str, Path]):
+        """
+        Defines a model (.obj) and texture for this `TinyRenderer`.
+        """
+        self.load_model(Path(model_filename))
+        self._texture_image = np.flipud(Image.open(texture_filename))[..., ::-1]
 
     @property
     def bitmap(self) -> Bitmap:
@@ -105,7 +117,8 @@ class TinyRenderer:
         self._render_mode = render_mode
         self._light_mode = light_mode
         self._rasterize()
-        self._bitmap.bind_texture(pixels=self.get_image())
+        if self._bind_texture:
+            self._bitmap.bind_texture(pixels=self.get_image())
 
     def clear(self):
         self._image = np.zeros((self._height, self._width, 3), np.uint8)
@@ -184,14 +197,13 @@ class TinyRenderer:
             Complete path to the image including the extension
         """
         assert filename.parent.is_dir()
-        cv2.imwrite(str(filename), self._image)
+        Image.fromarray(self._image).save(filename)
 
     def draw_line(self, v0: Vec3, v1: Vec3, c0: Color, c1: Color):
         """
         Draws a line to `self._image`, from (x0, y0) to (x1, y1) using Bresenham's algorithm
         """
-        v0, v1 = Vec3.clone(v0), Vec3.clone(v1)
-        if (v0.x, v0.y) == (v1.x, v1.y):
+        if v0 == v1:
             # This is a point, not a line.
             return
 

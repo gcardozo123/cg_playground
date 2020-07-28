@@ -2,12 +2,14 @@ name: cg_playground-py38
 
 dependencies:
   - python==3.8.1
-  - opencv==4.2.0
   - numpy>=1.11.0
   - pytest
+  - pytest-regressions
   - pytest-mock>=1.10
   - conda-wrappers
   - esss_fix_format
+  - isort>=4.3.4, <5.0 # esss_fix_format issue #52
+  - pillow
   - pip:
       - imgui[full]
 
