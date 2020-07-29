@@ -14,14 +14,17 @@ class TinyRendererEditor(Scene):
         self._light_mode_captions = LightingMode.get_captions()
         self._light_mode = LightingMode.Flat
 
-        self._model = TinyRenderer()
+        self._renderer = TinyRenderer()
+        self._renderer.setup_model(
+            "../resources/african_head.obj", "../resources/african_head_diffuse.jpg"
+        )
         self._time_to_render = 0
 
     def on_click_render(self):
-        self._model.render(self._render_mode, self._light_mode)
+        self._renderer.render(self._render_mode, self._light_mode)
 
     def update(self):
-        bitmap = self._model.bitmap
+        bitmap = self._renderer.bitmap
         if bitmap is None:
             return
 
